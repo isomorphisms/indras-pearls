@@ -2,73 +2,81 @@
 
 Living design-debate notes for rendering the ruffles/frills material from *Indra's Pearls*.
 
+## Current decision
+
+Use **Processing** for the current prototype and stop the renderer/backend bakeoff for now.
+
+The immediate unknown is mathematical: how the intrinsic hyperbolic geometry is turned into a finite ruffled or frilled surface in ordinary 3-space. There is no point adding more graphics infrastructure until that map is specified.
+
+The Processing stub lives in `processing/RuffleStub/`.
+
 ## Target
 
 The actual target is Android, not a generic browser. Browser portability is therefore not a reason by itself to choose a web rendering stack.
 
+## What we expect to draw
+
+At the rendering boundary, the object is simple: a finite triangulated surface in 3-space.
+
+Processing receives 3-D vertex positions and triangles and draws them with `P3D`.
+
+Before rendering, however, there are two separate geometries:
+
+1. **Intrinsic hyperbolic geometry** says what distances, circumferences, and areas the surface itself should have.
+2. **Extrinsic 3-D placement** says where those points are placed in ordinary Euclidean 3-space so that the sheet bends into a ruffle/frill while approximately respecting the intrinsic geometry.
+
+For curvature `-1`, a useful polar-coordinate bookkeeping model is
+
+```
+ds^2 = dr^2 + sinh(r)^2 dtheta^2
+C(r) = 2 pi sinh(r)
+A(r) = 2 pi (cosh(r) - 1)
+```
+
+A flat Euclidean disk at the same radial distance would only have circumference `2 pi r`. The hyperbolic surface therefore wants much more material around the outer rings. The ruffle is the 3-D bending that accommodates that excess intrinsic circumference.
+
+Do **not** read the hyperbolic area formula as a formula for ruffle height. Area/circumference give intrinsic target geometry. A separate embedding or approximation determines `(x,y,z)`.
+
+The missing mathematical boundary is therefore
+
+```
+X(r, theta) = (x, y, z)
+```
+
+or its discrete equivalent: a 3-D position for every mesh vertex whose nearby Euclidean edge lengths approximate the hyperbolic target lengths.
+
 ## JavaScript / Three.js question
 
-Three.js is an obvious JavaScript answer for interactive geometry, but it should not be treated as the default.
+Three.js was considered because it can plainly render interactive geometry, but it is not the current direction. JavaScript plus Three.js introduces another runtime/library surface, and the target is Android rather than a generic browser.
 
-Reasons to hesitate:
-
-- JavaScript itself is not yet a comfortable dependency here. We may eventually have our own rewritten/hackable JavaScript implementation, but that is not something to assume today.
-- Choosing Three.js also means taking on another substantial library surface that we may then want to modify or understand deeply.
-- Every extra runtime, library, bridge, and build layer adds failure points.
-- That extra surface area matters especially when the intended program is an Android application rather than a web demo.
-
-So the question is not “can Three.js draw this?” It almost certainly can. The question is whether bringing in JavaScript + Three.js is worth the additional machinery for an Android-first renderer.
+This is not a permanent rejection of Three.js. It is simply irrelevant to the present mathematical problem.
 
 ## Separate renderer repositories
 
-Dependency surface inside the main repository is not a reason to avoid renderer experiments. A renderer can always get its own repository. That makes a bakeoff cheap: different renderers can consume the same mathematical description without forcing their runtimes or libraries into the Indra's Pearls repository.
+Renderer experiments can always live in separate repositories. Dependency surface inside the main repository is therefore not by itself a reason to reject an experiment.
 
-The question is therefore less “which dependency can we tolerate?” and more “which renderer expresses the ruffles/frills mathematics cleanly and works well on Android?”
+That point remains true, but it is not a reason to keep starting renderer experiments before the ruffle construction itself is understood.
 
 ## Processing
 
-Processing is an obvious serious candidate for the first experiment.
+Processing is the current choice because it is close to the mathematical-sketch workflow: construct points/triangles and draw them directly.
 
-Why it fits:
+The first stub uses a regular `(r, theta)` mesh and isolates the missing mathematics in one function:
 
-- It is close to the mathematical-sketch workflow: construct points, curves, triangles or a parametric surface and draw them directly.
-- It does not require adopting a browser architecture or JavaScript just to get interactive 3D geometry.
-- It is suitable for quickly determining what the ruffles/frills construction should actually look like before designing a lower-level renderer around it.
-- If the experiment lives in its own repository, there is little cost to discovering later that Processing should not be the final renderer.
+```
+PVector surfacePoint(float r, float theta)
+```
 
-Processing should therefore be included in the renderer bakeoff, and may be the best first prototype precisely because the initial problem is mathematical visualization rather than engine architecture.
+For now that function returns a flat annulus solely so that the mesh/camera/drawing path exists. The flat annulus is **not** a proposed hyperbolic model.
 
-## Other candidate directions
+Once the ruffle/frill construction is specified, `surfacePoint` (or a discrete embedding stage replacing it) is where that mathematics enters.
 
-Candidates worth comparing include:
+## Other renderer directions — parked
 
-- Processing
-- raw OpenGL ES
-- Filament
-- bgfx
-- libGDX
-- Three.js
-- Vulkan only if the lower-level control turns out to be necessary
+Previously discussed possibilities include raw OpenGL ES, Filament, bgfx, libGDX, Three.js, and Vulkan. They are parked. Do not spend current work comparing or implementing them.
 
-This is not a ranking yet.
+## Next mathematical question
 
-## Current bias
+Decide what construction turns the intrinsic hyperbolic patch into the visible ruffle/frill. Possibilities include an explicit parametric immersion, a constrained mesh relaxed in 3-space, or a construction specific to the examples in *Indra's Pearls*.
 
-Prefer the rendering path that makes the mathematics easiest to express and runs acceptably on Android. Because experiments can live in separate repositories, do not reject a candidate merely because it brings its own library or runtime.
-
-Do not choose an engine yet. In particular, do not choose Three.js merely because it is familiar or convenient for browser graphics.
-
-## Things to determine before choosing a renderer
-
-- What are ruffles and frills geometrically in the examples we actually want to reproduce?
-- Do we need a triangle mesh, line/curve rendering, a shader-defined surface, or some combination?
-- Which parts should live in the mathematical core and which parts are merely display code?
-- How much interaction is needed: static view, rotation/pan, parameter changes, animation?
-- Can the renderer consume a small neutral geometry representation so that renderer experiments do not infect the mathematical code?
-- What is the smallest Android-native path if a prototype needs to become a production renderer?
-
-## Design rule for now
-
-Keep the mathematical description of the ruffles/frills separate from whichever renderer is tried first. The first renderer should be replaceable rather than becoming the architecture.
-
-This file should accumulate the arguments, failed experiments, and decisions as the rendering design develops.
+Until that is decided, the renderer should remain only a triangulated-surface stub.
