@@ -1,6 +1,6 @@
 # Coxeter word handoff
 
-This repository is the intended rendering side of an optional handoff from `isomorphisms/coxeter`.
+This repository is the intended rendering side of an optional handoff from `isomorphismes/coxeter`.
 
 The Coxeter side now has a design-time prompt that may appear only when an upstream caller has already established that a word has an associated renderable hyperbolic surface. The A2/A3 reducer itself must not infer hyperbolic geometry from a finite spherical word.
 
@@ -18,7 +18,7 @@ The rendering repository should receive explicit geometric data, not try to reve
 ```text
 {
   schema: "coxeter-hyperbolic-render/v0",
-  source: "isomorphisms/coxeter",
+  source: "isomorphismes/coxeter",
   word: [...],
   representation: <explicit hyperbolic/Kleinian data>,
   provenance: <how that representation was established>
