@@ -11,6 +11,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "group_state.h"
+#include "limit_set_renderer.h"
+
 #define LOG_TAG "IndrasPearls"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -30,6 +33,9 @@ struct engine {
     int32_t height;
 
     struct camera camera;
+    struct limit_set_group group;
+    struct limit_set_renderer renderer;
+
     bool dragging;
     bool pinching;
     float last_x;
@@ -37,6 +43,8 @@ struct engine {
     float last_span;
     bool dirty;
 };
+
+static void terminate_display(struct engine *engine);
 
 static float pointer_span(const AInputEvent *event) {
     if (AMotionEvent_getPointerCount(event) < 2) {
@@ -118,9 +126,19 @@ static bool initialize_display(struct engine *engine) {
     engine->context = context;
     eglQuerySurface(display, surface, EGL_WIDTH, &engine->width);
     eglQuerySurface(display, surface, EGL_HEIGHT, &engine->height);
-    engine->dirty = true;
 
-    LOGI("GLES stub ready: %s / %s", glGetString(GL_VERSION), glGetString(GL_RENDERER));
+    if (!initialize_limit_set_renderer(&engine->renderer)) {
+        LOGE("could not initialize full-screen limit-set renderer");
+        terminate_display(engine);
+        return false;
+    }
+
+    engine->dirty = true;
+    LOGI(
+        "GLES limit-set renderer ready: %s / %s",
+        (const char *)glGetString(GL_VERSION),
+        (const char *)glGetString(GL_RENDERER)
+    );
     return true;
 }
 
@@ -128,6 +146,8 @@ static void terminate_display(struct engine *engine) {
     if (engine->display == EGL_NO_DISPLAY) {
         return;
     }
+
+    terminate_limit_set_renderer(&engine->renderer);
 
     eglMakeCurrent(engine->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     if (engine->context != EGL_NO_CONTEXT) {
@@ -156,19 +176,15 @@ static void draw_frame(struct engine *engine) {
         return;
     }
 
-    glViewport(0, 0, engine->width, engine->height);
-
-    /*
-     * Placeholder first paint only. The first real renderer should be one
-     * full-screen GLES3 limit-set shader with uniforms shaped roughly as:
-     *
-     *   vec2  u_center = (camera.center_x, camera.center_y)
-     *   float u_scale  = camera.scale
-     *
-     * Group parameters belong outside Android input dispatch.
-     */
-    glClearColor(0.02f, 0.02f, 0.025f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    draw_limit_set(
+        &engine->renderer,
+        &engine->group,
+        engine->camera.center_x,
+        engine->camera.center_y,
+        engine->camera.scale,
+        engine->width,
+        engine->height
+    );
 
     if (!eglSwapBuffers(engine->display, engine->surface)) {
         LOGE("eglSwapBuffers failed: 0x%x", eglGetError());
@@ -293,6 +309,7 @@ void android_main(struct android_app *app) {
     engine.camera.center_x = 0.0f;
     engine.camera.center_y = 0.0f;
     engine.camera.scale = 4.0f;
+    initialize_bundled_limit_set_group(&engine.group);
     engine.dirty = true;
 
     app->userData = &engine;
