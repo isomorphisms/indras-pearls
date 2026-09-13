@@ -8,7 +8,11 @@ add_library(native_app_glue STATIC
 )
 target_include_directories(native_app_glue PUBLIC "${NATIVE_GLUE_DIR}")
 
-add_library(indras_pearls SHARED native_app_glue_stub.c)
+add_library(indras_pearls SHARED
+    group_state.c
+    limit_set_renderer.c
+    native_app_glue_stub.c
+)
 target_compile_features(indras_pearls PRIVATE c_std_11)
 target_compile_options(indras_pearls PRIVATE -Wall -Wextra -Wpedantic)
 target_link_options(indras_pearls PRIVATE -u ANativeActivity_onCreate)
